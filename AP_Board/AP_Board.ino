@@ -30,8 +30,10 @@ void initSPIFFS()
 
 void setup()
 {
+  delay(3000); // Wait for 3 seconds
+
   Serial.begin(115200);
-  Serial.println("Initializing ...");
+  Serial.print("Initializing ...");
   setupTFMini(SerialTFMini, tfmini);
   initWiFi();
   initSPIFFS();
@@ -43,20 +45,28 @@ void setup()
   Serial.println("Server started");
 }
 
+unsigned long printInterval = 5000; // Print every 5000 ms (5 seconds)
+unsigned long lastPrintTime = 0;
+
 void loop()
 {
-  int distance = 0;
-  int strength = 0;
-  getTFminiData(SerialTFMini, &distance, &strength);
+  int16_t distance = 0;
+  int16_t strength = 0;
+  int16_t temperature = 0;
 
-  Serial.print("Distance: ");
-  Serial.print(distance);
-  Serial.print(" Strength: ");
-  Serial.println(strength);
+  tfmini.getData(distance, strength, temperature);
+
+  unsigned long currentTime = millis();
+  if (currentTime - lastPrintTime >= printInterval) {
+    Serial.print("AP_Distance: ");
+    Serial.println(distance);
+    lastPrintTime = currentTime;
+  }
+
   server.handleClient();
-
-  delay(50);
+  delay(5);
 }
+
 
 void initWiFi()
 {
@@ -74,23 +84,33 @@ void initWiFi()
   Serial.println(myIP);
 }
 
-void handleSpeedData()
-{
-  if (server.hasArg("DIST1") && server.hasArg("TIME1"))
-  {
-    int dist1 = server.arg("DIST1").toInt();
+void handleSpeedData() {
+  static int16_t prevDistance = 0;
+
+  if (server.hasArg("DIST1") && server.hasArg("TIME1")) {
+    int staDistance = server.arg("DIST1").toInt();
     unsigned long time1 = server.arg("TIME1").toInt();
-    int distance = 0;
-    int strength = 0;
-    getTFminiData(SerialTFMini, &distance, &strength); // Call the function without an if statement
-    unsigned long time2 = millis();
-    float speed = calculateSpeed(time1, time2, 10);
-    storeSpeedData(speed, dist1, distance);
-    server.send(200, "text/plain", "Speed data stored");
-  }
-  else
-  {
+
+    int16_t distance = 0;
+    int16_t strength = 0;
+    int16_t temperature = 0;
+    tfmini.getData(distance, strength, temperature);
+
+    if (abs(distance - prevDistance) > 50) {
+      Serial.print("Distance change detected: ");
+      Serial.println(distance - prevDistance);
+      unsigned long time2 = millis();
+      float speed = calculateSpeed(time1, time2, 10);
+      storeSpeedData(speed, staDistance, distance);
+      prevDistance = distance;
+      server.send(200, "text/plain", "Speed data stored");
+      Serial.println("Event registered: Speed data stored");
+    } else {
+      Serial.println("Distance change is less than 50cm, data not stored");
+    }
+  } else {
     server.send(400, "text/plain", "Missing DIST1 or TIME1 parameter");
+    Serial.println("Server response sent: Missing DIST1 or TIME1 parameter");
   }
 }
 
@@ -102,11 +122,14 @@ float calculateSpeed(unsigned long time1, unsigned long time2, float distanceBet
   return speed;
 }
 
-void storeSpeedData(float speed, int staDistance, int apDistance)
-{
+void storeSpeedData(float speed, int staDistance, int apDistance) {
   Serial.println("Speed data route accessed.");
   unsigned long timestamp = millis();
   speedFile = SPIFFS.open("/speedData.csv", "a");
+  if (!speedFile) {
+    Serial.println("Error opening file for writing");
+    return;
+  }
   speedFile.print(timestamp);
   speedFile.print(",");
   speedFile.print(speed, 4);
