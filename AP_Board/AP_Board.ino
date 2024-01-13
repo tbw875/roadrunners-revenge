@@ -5,6 +5,7 @@
 #include "TFMPlus.h"
 #include <FS.h> // Include the SPIFFS library
 #include "TFMiniSensor.h"
+#include <LiquidCrystal.h>
 
 // Replace with your network credentials
 const char *ssid = "ESP8266_AP";
@@ -15,6 +16,8 @@ ESP8266WebServer server(80);
 TFMPlus tfmini;
 SoftwareSerial SerialTFMini(12, 13);
 File speedFile;
+
+LiquidCrystal lcd(4, 5, 0, 3, 1, 5);
 
 void initSPIFFS()
 {
@@ -30,10 +33,13 @@ void initSPIFFS()
 
 void setup()
 {
+  lcd.begin(16, 2);
+  lcd.print("I'm Alive!!!");
   delay(3000); // Wait for 3 seconds
 
   Serial.begin(115200);
   Serial.print("Initializing ...");
+  lcd.print("Initializing ...");
   setupTFMini(SerialTFMini, tfmini);
   initWiFi();
   initSPIFFS();
@@ -42,7 +48,8 @@ void setup()
   server.on("/speed", HTTP_POST, handleSpeedData);
   server.on("/", HTTP_GET, handleRoot);
   server.begin();
-  Serial.println("Server started");
+  Serial.print("Server started");
+  lcd.print("Server started");
 }
 
 unsigned long printInterval = 5000; // Print every 5000 ms (5 seconds)
@@ -60,6 +67,7 @@ void loop()
   if (currentTime - lastPrintTime >= printInterval) {
     Serial.print("AP_Distance: ");
     Serial.println(distance);
+    lcd.print(distance);
     lastPrintTime = currentTime;
   }
 
@@ -74,13 +82,15 @@ void initWiFi()
   WiFi.softAP(ssid, password);
 
   Serial.println("Setting up Access Point...");
-  Serial.print("SSID: ");
+  lcd.print("Setting up Access Point...");
+  Serial.print("SSID: ");  
   Serial.println(ssid);
   Serial.print("Password: ");
   Serial.println(password);
 
   IPAddress myIP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
+  lcd.print(myIP);
   Serial.println(myIP);
 }
 
@@ -139,6 +149,7 @@ void storeSpeedData(float speed, int staDistance, int apDistance) {
   speedFile.println(apDistance);
   speedFile.close();
   Serial.print("Speed data stored: ");
+  lcd.print("Speed Data Stored!");
   Serial.print(timestamp);
   Serial.print("ms, ");
   Serial.print(speed);
@@ -148,6 +159,7 @@ void storeSpeedData(float speed, int staDistance, int apDistance) {
 void handleFileDownload()
 {
   Serial.println("Download route accessed.");
+  lcd.print("Download Route Accessed.");
   String path = "/speedData.csv";
   if (SPIFFS.exists(path))
   {
@@ -165,5 +177,6 @@ void handleFileDownload()
 void handleRoot()
 {
   Serial.println("Root route accessed.");
+  lcd.print("Root accessed");
   server.send(200, "text/plain", "Hello from ESP8266 AP!");
 }

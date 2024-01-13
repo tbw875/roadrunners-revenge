@@ -50,7 +50,7 @@ void sendDistanceToAPBoard(int distance) {
     String postData = "DIST1=" + String(distance) + "&TIME1=" + String(timestamp);
     int httpCode = http.POST(postData);
     
-    Serial.print("Sending distance to AP board: "); // Add this line
+    Serial.print("Sending distance to AP board: ");
     Serial.println(distance);    
     if (httpCode > 0) {
       Serial.printf("[HTTP] POST... code: %d\n", httpCode);
